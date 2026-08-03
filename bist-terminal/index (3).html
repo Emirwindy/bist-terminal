@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>BİST Terminali</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+    <style>
+        :root {
+            --bg: #131722;
+            --panel: #1e222d;
+            --border: #2a2e39;
+            --text: #d1d4dc;
+            --accent: #2962ff;
+            --hover: #2a2e39;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); height: 100vh; display: flex; overflow: hidden; }
+
+        .sidebar { width: 55px; background: var(--panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; padding-top: 15px; gap: 20px; z-index: 10; }
+        .nav-icon { width: 38px; height: 38px; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: #787b86; cursor: pointer; font-size: 16px; }
+        .nav-icon.active { background: var(--hover); color: var(--accent); }
+
+        .main-wrapper { flex: 1; display: flex; flex-direction: column; height: 100vh; }
+
+        .header { background: var(--panel); padding: 8px 15px; border-bottom: 1px solid var(--border); display: flex; gap: 10px; align-items: center; }
+
+        .search-container { position: relative; width: 160px; }
+        .search-container input { width: 100%; padding: 6px 10px; border: 1px solid var(--border); background: var(--bg); color: var(--text); outline: none; border-radius: 4px; text-transform: uppercase; font-weight: bold; font-size: 12px; }
+        .search-results { position: absolute; top: 110%; left: 0; right: 0; background: var(--panel); border: 1px solid var(--border); border-radius: 4px; max-height: 250px; overflow-y: auto; display: none; z-index: 100; }
+        .search-item { padding: 8px 10px; cursor: pointer; border-bottom: 1px solid var(--border); font-size: 12px; display: flex; justify-content: space-between; }
+        .search-item:hover { background: var(--hover); color: var(--accent); }
+
+        button.get-btn { padding: 6px 14px; border-radius: 4px; border: none; background: var(--accent); color: white; font-weight: bold; cursor: pointer; font-size: 12px; }
+        .stock-display { margin-left: auto; font-weight: bold; display: flex; align-items: center; gap: 10px; }
+        #priceDisplay { color: #089981; font-size: 18px; }
+        #priceDisplay.error { color: #f23645; font-size: 13px; }
+        #priceChange { font-size: 13px; font-weight: bold; }
+        #priceChange.up { color: #089981; }
+        #priceChange.down { color: #f23645; }
+        .live-badge { background: #089981; color: white; font-size: 9px; padding: 2px 6px; border-radius: 4px; font-weight: bold; }
+
+        .chart-empty-msg { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #787b86; font-size: 13px; text-align: center; display: none; z-index: 4; }
+
+        .clock-box { font-family: monospace; font-size: 13px; color: #787b86; border-left: 1px solid var(--border); padding-left: 12px; margin-left: 4px; }
+        .clock-box span { color: var(--text); font-weight: bold; }
+
+        .timeframe-bar { display: flex; gap: 4px; padding: 6px 15px; background: var(--panel); border-bottom: 1px solid var(--border); }
+        .timeframe-btn { padding: 5px 12px; border-radius: 4px; border: none; background: transparent; color: #787b86; font-size: 12px; font-weight: bold; cursor: pointer; }
+        .timeframe-btn:hover { background: var(--hover); color: var(--text); }
+        .timeframe-btn.active { background: var(--accent); color: white; }
+
+        .content-section { flex: 1; display: none; min-height: 0; flex-direction: column; }
+        .content-section.active { display: flex; }
+
+        .chart-and-kap-layout { flex: 1; display: flex; width: 100%; height: 100%; }
+        #chart-zone { flex: 1; position: relative; height: 100%; width: 100%; }
+
+        .side-kap-panel { width: 280px; background: var(--panel); border-left: 1px solid var(--border); display: flex; flex-direction: column; padding: 12px; gap: 10px; overflow-y: auto; }
+        .side-kap-header { font-size: 13px; font-weight: bold; color: var(--accent); border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+
+        .chart-info-overlay { position: absolute; top: 10px; left: 15px; font-size: 12px; font-family: monospace; color: #787b86; pointer-events: none; z-index: 5; background: rgba(19, 23, 34, 0.85); padding: 4px 8px; border-radius: 4px; border: 1px solid var(--border); }
+        .chart-info-overlay span { color: var(--text); font-weight: bold; }
+
+        #kap-zone { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+        .news-card { background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 12px; }
+        .news-title { font-size: 13px; font-weight: bold; margin-bottom: 4px; color: var(--accent); }
+        .news-date { font-size: 10px; color: #787b86; margin-bottom: 6px; }
+        .news-body { font-size: 12px; line-height: 1.4; color: #b2b5be; }
+
+        #watchlist-zone { flex: 1; padding: 20px; overflow-y: auto; }
+        .watchlist-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; font-size: 14px; font-weight: bold; color: var(--accent); }
+        .watchlist-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .watchlist-table th { text-align: left; padding: 8px 12px; color: #787b86; border-bottom: 1px solid var(--border); font-size: 11px; text-transform: uppercase; }
+        .watchlist-table td { padding: 9px 12px; border-bottom: 1px solid var(--border); }
+        .watchlist-table tbody tr { cursor: pointer; }
+        .watchlist-table tbody tr:hover { background: var(--hover); }
+        .watchlist-msg { text-align: center; color: #787b86; padding: 24px; }
+        .change-up { color: #089981; font-weight: bold; }
+        .change-down { color: #f23645; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <div class="sidebar">
+        <div class="nav-icon active" onclick="switchTab('chart')" title="Canlı Grafik">
+            <i class="fa-solid fa-chart-line"></i>
+        </div>
+        <div class="nav-icon" onclick="switchTab('kap')" title="Genel KAP Akışı">
+            <i class="fa-solid fa-newspaper"></i>
+        </div>
+        <div class="nav-icon" onclick="switchTab('watchlist')" title="Tüm Hisseler">
+            <i class="fa-solid fa-list"></i>
+        </div>
+    </div>
+
+    <div class="main-wrapper">
+        <div class="header">
+            <div class="search-container">
+                <input type="text" id="tickerInput" value="THYAO" placeholder="Hisse Ara..." onfocus="showSearchList()" oninput="filterStocks()">
+                <div class="search-results" id="searchResults"></div>
+            </div>
+            <button class="get-btn" onclick="changeStock()">Getir</button>
+            <span class="live-badge">🔴 CANLI</span>
+            <div class="stock-display">
+                <span id="currentTicker">THYAO</span>
+                <span id="priceDisplay">Yükleniyor...</span>
+                <span id="priceChange"></span>
+            </div>
+            <div class="clock-box">
+                <i class="fa-regular fa-clock"></i> <span id="liveClock">--:--:--</span>
+            </div>
+        </div>
+
+        <div id="tab-chart" class="content-section active">
+            <div class="timeframe-bar" id="timeframeBar"></div>
+            <div class="chart-and-kap-layout">
+                <div id="chart-zone">
+                    <div class="chart-info-overlay" id="ohlcBox">
+                        Tarih: <span id="infoDate">-</span> |
+                        A: <span id="infoOpen">-</span>
+                        Y: <span id="infoHigh">-</span>
+                        D: <span id="infoLow">-</span>
+                        K: <span id="infoClose">-</span>
+                    </div>
+                    <div class="chart-empty-msg" id="chartEmptyMsg">Bu periyot için veri bulunamadı.<br>Başka bir zaman dilimi deneyin.</div>
+                </div>
+
+                <div class="side-kap-panel">
+                    <div class="side-kap-header">
+                        <i class="fa-solid fa-bullhorn"></i> <span id="sideKapTicker">THYAO</span> KAP Haberleri
+                    </div>
+                    <div id="sideKapList"></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="tab-kap" class="content-section">
+            <div id="kap-zone">
+                <div class="news-card">
+                    <div class="news-title">BİST Genel Akış - Piyasa Duyurusu</div>
+                    <div class="news-date">Bugün</div>
+                    <div class="news-body">Borsa İstanbul işlemleriniz başarıyla senkronize edilmektedir.</div>
+                </div>
+            </div>
+        </div>
+
+        <div id="tab-watchlist" class="content-section">
+            <div id="watchlist-zone">
+                <div class="watchlist-header">
+                    <div><i class="fa-solid fa-list"></i> Tüm Hisseler</div>
+                    <button class="get-btn" onclick="fetchWatchlist()">Yenile</button>
+                </div>
+                <table class="watchlist-table">
+                    <thead>
+                        <tr><th>Kod</th><th>İsim</th><th>Fiyat</th><th>Günlük %</th></tr>
+                    </thead>
+                    <tbody id="watchlistBody">
+                        <tr><td colspan="4" class="watchlist-msg">Yükleniyor...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://127.0.0.1:8000';
+
+        const bistList = [
+            { code: "THYAO", name: "Türk Hava Yolları" },
+            { code: "SASA", name: "Sasa Polyester" },
+            { code: "EREGL", name: "Ereğli Demir Çelik" },
+            { code: "TUPRS", name: "Tüpraş" },
+            { code: "AKBNK", name: "Akbank" },
+            { code: "GARAN", name: "Garanti BBVA" },
+            { code: "ISCTR", name: "İş Bankası (C)" },
+            { code: "ASELS", name: "Aselsan" },
+            { code: "KCHOL", name: "Koç Holding" },
+            { code: "BIMAS", name: "BİM Mağazalar" },
+            { code: "SAHOL", name: "Sabancı Holding" },
+            { code: "PGSUS", name: "Pegasus" },
+            { code: "YKBNK", name: "Yapı Kredi" },
+            { code: "VAKBN", name: "VakıfBank" },
+            { code: "HALKB", name: "Halkbank" },
+            { code: "TCELL", name: "Turkcell" },
+            { code: "TTKOM", name: "Türk Telekom" },
+            { code: "FROTO", name: "Ford Otosan" },
+            { code: "TOASO", name: "Tofaş Oto" },
+            { code: "ARCLK", name: "Arçelik" },
+            { code: "PETKM", name: "Petkim" },
+            { code: "KOZAL", name: "Koza Altın" },
+            { code: "KOZAA", name: "Koza Madencilik" },
+            { code: "SISE", name: "Şişecam" },
+            { code: "MGROS", name: "Migros" },
+            { code: "ULKER", name: "Ülker Bisküvi" },
+            { code: "VESTL", name: "Vestel" },
+            { code: "ENKAI", name: "Enka İnşaat" },
+            { code: "TAVHL", name: "TAV Havalimanları" },
+            { code: "ALARK", name: "Alarko Holding" },
+            { code: "DOHOL", name: "Doğan Holding" },
+            { code: "GUBRF", name: "Gübre Fabrikaları" },
+            { code: "KRDMD", name: "Kardemir (D)" },
+            { code: "OYAKC", name: "Oyak Çimento" },
+            { code: "CCOLA", name: "Coca-Cola İçecek" },
+            { code: "AEFES", name: "Anadolu Efes" },
+            { code: "SOKM", name: "Şok Marketler" },
+            { code: "HEKTS", name: "Hektaş" }
+        ];
+
+        // Backend'deki INTERVAL_PERIOD_MAP ile birebir eşleşmeli
+        const TIMEFRAMES = [
+            { value: '1m',  label: '1dk' },
+            { value: '5m',  label: '5dk' },
+            { value: '15m', label: '15dk' },
+            { value: '60m', label: '1s' },
+            { value: '1d',  label: 'Günlük' },
+            { value: '1wk', label: 'Haftalık' },
+            { value: '1mo', label: 'Aylık' },
+        ];
+        const INTRADAY_INTERVALS = new Set(['1m', '5m', '15m', '60m']);
+
+        let tvChart = null;
+        let candleSeries = null;
+        let currentTicker = 'THYAO';
+        let currentInterval = '1d';
+        let pollTimer = null;
+
+        function initChart() {
+            const container = document.getElementById('chart-zone');
+
+            tvChart = LightweightCharts.createChart(container, {
+                width: container.clientWidth,
+                height: container.clientHeight,
+                layout: {
+                    background: { type: 'solid', color: '#131722' },
+                    textColor: '#d1d4dc',
+                },
+                grid: {
+                    vertLines: { color: '#1e222d' },
+                    horzLines: { color: '#1e222d' },
+                },
+                rightPriceScale: {
+                    borderColor: '#2a2e39',
+                    visible: true
+                },
+                timeScale: {
+                    borderColor: '#2a2e39',
+                    timeVisible: false, // gunluk mumlarda saat gostermeye gerek yok
+                },
+            });
+
+            candleSeries = tvChart.addCandlestickSeries({
+                upColor: '#089981',
+                downColor: '#f23645',
+                borderVisible: false,
+                wickUpColor: '#089981',
+                wickDownColor: '#f23645',
+            });
+
+            tvChart.subscribeCrosshairMove(param => {
+                if (param.time) {
+                    const priceData = param.seriesPrices.get(candleSeries);
+                    if (priceData) {
+                        // Backend artik gunluk mumlar icin 'YYYY-MM-DD' string gonderiyor.
+                        // lightweight-charts bunu {year, month, day} nesnesine ceviriyor,
+                        // bu yuzden hem string hem object formatini burada karsiliyoruz.
+                        document.getElementById('infoDate').innerText = formatBarTime(param.time);
+                        document.getElementById('infoOpen').innerText = priceData.open.toFixed(2);
+                        document.getElementById('infoHigh').innerText = priceData.high.toFixed(2);
+                        document.getElementById('infoLow').innerText = priceData.low.toFixed(2);
+                        document.getElementById('infoClose').innerText = priceData.close.toFixed(2);
+                    }
+                }
+            });
+
+            window.addEventListener('resize', () => {
+                if (tvChart && container) {
+                    tvChart.applyOptions({ width: container.clientWidth, height: container.clientHeight });
+                }
+            });
+        }
+
+        function formatBarTime(t) {
+            if (typeof t === 'object' && t !== null && 'year' in t) {
+                const d = String(t.day).padStart(2, '0');
+                const m = String(t.month).padStart(2, '0');
+                return `${d}.${m}.${t.year}`;
+            }
+            if (typeof t === 'number') {
+                // Gün-içi periyotlarda saat de gösteriliyor, günlük+ periyotlarda tarih yeterli
+                if (INTRADAY_INTERVALS.has(currentInterval)) {
+                    return new Date(t * 1000).toLocaleString('tr-TR');
+                }
+                return new Date(t * 1000).toLocaleDateString('tr-TR');
+            }
+            return String(t);
+        }
+
+        function renderTimeframeBar() {
+            const bar = document.getElementById('timeframeBar');
+            bar.innerHTML = '';
+            TIMEFRAMES.forEach(tf => {
+                const btn = document.createElement('button');
+                btn.className = 'timeframe-btn' + (tf.value === currentInterval ? ' active' : '');
+                btn.innerText = tf.label;
+                btn.onclick = () => selectTimeframe(tf.value);
+                bar.appendChild(btn);
+            });
+        }
+
+        function selectTimeframe(value) {
+            if (value === currentInterval) return;
+            currentInterval = value;
+            renderTimeframeBar();
+            // Gün-içi periyotlarda saat ekseni gösterilsin, günlük+ periyotlarda gizlensin
+            tvChart.applyOptions({ timeScale: { timeVisible: INTRADAY_INTERVALS.has(currentInterval) } });
+            document.getElementById('priceDisplay').innerText = 'Yükleniyor...';
+            clearPriceError();
+            fetchLiveStockData();
+        }
+
+        function setPriceError(message) {
+            const el = document.getElementById('priceDisplay');
+            el.innerText = message;
+            el.classList.add('error');
+            document.getElementById('priceChange').textContent = '';
+            document.getElementById('priceChange').className = '';
+        }
+
+        function clearPriceError() {
+            document.getElementById('priceDisplay').classList.remove('error');
+        }
+
+        async function fetchLiveStockData() {
+            try {
+                const res = await fetch(`${API_BASE}/api/stock/${currentTicker}?interval=${currentInterval}`);
+                if (!res.ok) {
+                    setPriceError(`Sunucu hatası (${res.status})`);
+                    return;
+                }
+                const data = await res.json();
+
+                if (data.error) {
+                    setPriceError(data.error);
+                    return;
+                }
+
+                clearPriceError();
+                document.getElementById('currentTicker').innerText = data.ticker;
+                document.getElementById('sideKapTicker').innerText = data.ticker;
+                document.getElementById('priceDisplay').innerText = data.price;
+
+                const changeEl = document.getElementById('priceChange');
+                if (typeof data.change_pct === 'number') {
+                    const changeUp = data.change_pct >= 0;
+                    changeEl.textContent = `${changeUp ? '▲' : '▼'} ${Math.abs(data.change_pct).toFixed(2)}%`;
+                    changeEl.className = changeUp ? 'up' : 'down';
+                } else {
+                    changeEl.textContent = '';
+                    changeEl.className = '';
+                }
+
+                const emptyMsg = document.getElementById('chartEmptyMsg');
+                if (!data.candles || data.candles.length === 0) {
+                    candleSeries.setData([]);
+                    candleSeries.setMarkers([]);
+                    emptyMsg.style.display = 'block';
+                    renderSideKap(data.kap);
+                    return;
+                }
+                emptyMsg.style.display = 'none';
+
+                candleSeries.setData(data.candles);
+
+                if (data.markers && data.markers.length > 0) {
+                    const tvMarkers = data.markers.map(m => ({
+                        time: m.time,
+                        position: m.type === 'BUY' ? 'belowBar' : 'aboveBar',
+                        color: m.type === 'BUY' ? '#089981' : '#f23645',
+                        shape: m.type === 'BUY' ? 'arrowUp' : 'arrowDown',
+                        text: m.type === 'BUY' ? 'AL' : 'SAT',
+                    }));
+                    candleSeries.setMarkers(tvMarkers);
+                } else {
+                    candleSeries.setMarkers([]);
+                }
+
+                renderSideKap(data.kap);
+                tvChart.timeScale().fitContent();
+
+            } catch (e) {
+                console.error("Backend Baglanti Hatasi:", e);
+                setPriceError("Bağlantı Yok! (backend çalışıyor mu?)");
+            }
+        }
+
+        function renderSideKap(kapList) {
+            const container = document.getElementById('sideKapList');
+            container.innerHTML = '';
+            if (!kapList || kapList.length === 0) {
+                container.innerHTML = '<div style="font-size:12px; color:#787b86">Haber yok.</div>';
+                return;
+            }
+            kapList.forEach(news => {
+                const card = document.createElement('div');
+                card.className = 'news-card';
+                card.innerHTML = `
+                    <div class="news-title">${escapeHtml(news.title)}</div>
+                    <div class="news-date"><i class="fa-regular fa-clock"></i> ${escapeHtml(news.date)}</div>
+                    <div class="news-body">${escapeHtml(news.body)}</div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.innerText = str ?? '';
+            return div.innerHTML;
+        }
+
+        const TAB_ORDER = ['chart', 'kap', 'watchlist'];
+
+        function switchTab(tabName) {
+            document.querySelectorAll('.nav-icon').forEach(icon => icon.classList.remove('active'));
+            document.querySelectorAll('.content-section').forEach(sec => sec.classList.remove('active'));
+
+            const idx = TAB_ORDER.indexOf(tabName);
+            if (idx >= 0) {
+                document.querySelectorAll('.nav-icon')[idx].classList.add('active');
+            }
+            document.getElementById('tab-' + tabName).classList.add('active');
+
+            if (tabName === 'chart') {
+                setTimeout(() => {
+                    const container = document.getElementById('chart-zone');
+                    tvChart.applyOptions({ width: container.clientWidth, height: container.clientHeight });
+                }, 50);
+            } else if (tabName === 'watchlist') {
+                fetchWatchlist();
+            }
+        }
+
+        async function fetchWatchlist() {
+            const body = document.getElementById('watchlistBody');
+            body.innerHTML = '<tr><td colspan="4" class="watchlist-msg">Yükleniyor...</td></tr>';
+            try {
+                const res = await fetch(`${API_BASE}/api/watchlist`);
+                const data = await res.json();
+
+                if (data.error || !data.stocks || data.stocks.length === 0) {
+                    body.innerHTML = `<tr><td colspan="4" class="watchlist-msg">${escapeHtml(data.error || 'Veri bulunamadı.')}</td></tr>`;
+                    return;
+                }
+
+                body.innerHTML = '';
+                data.stocks
+                    .slice()
+                    .sort((a, b) => a.code.localeCompare(b.code))
+                    .forEach(s => {
+                        const up = s.change_pct >= 0;
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td><strong>${escapeHtml(s.code)}</strong></td>
+                            <td style="color:#b2b5be">${escapeHtml(s.name)}</td>
+                            <td>${s.price.toFixed(2)} TL</td>
+                            <td class="${up ? 'change-up' : 'change-down'}">${up ? '▲' : '▼'} ${Math.abs(s.change_pct).toFixed(2)}%</td>
+                        `;
+                        tr.onclick = () => {
+                            document.getElementById('tickerInput').value = s.code;
+                            currentTicker = s.code;
+                            document.getElementById('priceDisplay').innerText = 'Yükleniyor...';
+                            clearPriceError();
+                            switchTab('chart');
+                            fetchLiveStockData();
+                        };
+                        body.appendChild(tr);
+                    });
+            } catch (e) {
+                body.innerHTML = '<tr><td colspan="4" class="watchlist-msg">Bağlantı hatası - backend çalışıyor mu?</td></tr>';
+            }
+        }
+
+        function showSearchList() {
+            filterStocks();
+            document.getElementById('searchResults').style.display = 'block';
+        }
+
+        function filterStocks() {
+            const query = document.getElementById('tickerInput').value.toUpperCase();
+            const listDiv = document.getElementById('searchResults');
+            listDiv.innerHTML = '';
+
+            const filtered = bistList.filter(item => item.code.includes(query) || item.name.toUpperCase().includes(query));
+
+            filtered.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'search-item';
+                div.innerHTML = `<strong>${item.code}</strong> <span style="color:#787b86">${item.name}</span>`;
+                div.onclick = function () {
+                    document.getElementById('tickerInput').value = item.code;
+                    listDiv.style.display = 'none';
+                    changeStock();
+                };
+                listDiv.appendChild(div);
+            });
+        }
+
+        document.addEventListener('click', function (e) {
+            if (!e.target.closest('.search-container')) {
+                document.getElementById('searchResults').style.display = 'none';
+            }
+        });
+
+        function changeStock() {
+            const val = document.getElementById('tickerInput').value.trim().toUpperCase();
+            if (val) {
+                currentTicker = val;
+                document.getElementById('priceDisplay').innerText = 'Yükleniyor...';
+                clearPriceError();
+                fetchLiveStockData();
+            }
+        }
+
+        function startClock() {
+            const el = document.getElementById('liveClock');
+            const tick = () => {
+                el.innerText = new Date().toLocaleTimeString('tr-TR', { hour12: false });
+            };
+            tick();
+            setInterval(tick, 1000);
+        }
+
+        window.onload = function () {
+            initChart();
+            renderTimeframeBar();
+            startClock();
+            fetchLiveStockData();
+            pollTimer = setInterval(fetchLiveStockData, 10000);
+        };
+    </script>
+</body>
+</html>
