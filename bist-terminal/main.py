@@ -1,25 +1,30 @@
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
 import yfinance as yf
 import os
 
 app = FastAPI()
 
-# 1. Ana sayfaya girildiğinde HTML dosyasını otomatik bulup ekrana basar
 @app.get("/")
 async def read_root():
-    # Klasördeki sonu .html ile biten ilk dosyayı yakalar (index (3).html dahil)
+    # 1. Aynı klasörde HTML var mı bakar
     for file in os.listdir("."):
         if file.endswith(".html"):
             return FileResponse(file)
-    return {"status": "error", "message": "Klasörde HTML dosyası bulunamadı!"}
+            
+    # 2. Bulamazsa bir üst (dış) klasördeki HTML'e bakar
+    if os.path.exists("../index (3).html"):
+        return FileResponse("../index (3).html")
+    
+    for file in os.listdir(".."):
+        if file.endswith(".html"):
+            return FileResponse(f"../{file}")
 
-# 2. Canlı BIST Veri Çekme API'si
+    return {"status": "error", "message": "HTML dosyasi bulunamadi!"}
+
 @app.get("/api/data")
 async def get_stock_data():
     try:
-        # BİST Takip Listesi
         tickers = ["THYAO.IS", "AKBNK.IS", "SASA.IS", "EREGL.IS", "GARAN.IS"]
         data = {}
         
